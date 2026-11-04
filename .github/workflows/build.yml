@@ -20,9 +20,13 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      - name: Enable Git Long Paths
+        run: git config --global core.longpaths true
+
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 1
 
       - uses: ilammy/msvc-dev-cmd@v1
 
