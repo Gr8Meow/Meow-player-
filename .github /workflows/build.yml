@@ -1,4 +1,4 @@
-name: Build Meow Player
+name: Build LiveWall
 
 on:
   push:
@@ -6,15 +6,9 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Least privilege: the build only reads the repo. The release job asks for more.
 permissions:
   contents: read
-
-env:
-  # Pinned libmpv build (LGPL) and its checksum. Update both together.
-  LIBMPV_REPO: zhongfly/mpv-winbuild
-  LIBMPV_TAG: 2026-11-01-add72571ea
-  LIBMPV_ASSET: mpv-dev-lgpl-x86_64-20261101-git-add72571ea.7z
-  LIBMPV_SHA256: a05f80aa36faecc25af840dca3a24af0cd32fa42a114bf7ea91dc21a80376f6c
 
 jobs:
   build:
@@ -40,34 +34,16 @@ jobs:
       - name: Compile (hardened)
         shell: cmd
         run: >
-          cl /O2 /EHsc /MT /GS /guard:cf /DUNICODE /D_UNICODE meowplayer.cpp
+          cl /O2 /EHsc /MT /GS /guard:cf /DUNICODE /D_UNICODE livewall.cpp
           /link /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup
           /guard:cf /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /DEPENDENTLOADFLAG:0x800
           user32.lib gdi32.lib shell32.lib ole32.lib comdlg32.lib advapi32.lib
-          shlwapi.lib dwmapi.lib gdiplus.lib winhttp.lib
-
-      - name: Download and verify libmpv
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release download $env:LIBMPV_TAG -R $env:LIBMPV_REPO --pattern $env:LIBMPV_ASSET --dir libmpv
-          $hash = (Get-FileHash "libmpv/$env:LIBMPV_ASSET" -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne $env:LIBMPV_SHA256) { throw "libmpv checksum mismatch: $hash" }
-          7z x -y "-olibmpv/x" "libmpv/$env:LIBMPV_ASSET" libmpv-2.dll
-
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist/MeowPlayer | Out-Null
-          Copy-Item meowplayer.exe, LICENSE, README.md, THIRD-PARTY.md dist/MeowPlayer/
-          Copy-Item libmpv/x/libmpv-2.dll dist/MeowPlayer/
-          Compress-Archive -Path dist/MeowPlayer -DestinationPath MeowPlayer-windows-x64.zip
+          shlwapi.lib dwmapi.lib gdiplus.lib mfplay.lib winhttp.lib
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MeowPlayer-windows-x64
-          path: MeowPlayer-windows-x64.zip
+          name: livewall-windows
+          path: livewall.exe
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -78,11 +54,11 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: MeowPlayer-windows-x64
+          name: livewall-windows
       - name: Checksum
-        run: sha256sum MeowPlayer-windows-x64.zip > MeowPlayer-windows-x64.zip.sha256
+        run: sha256sum livewall.exe > livewall.exe.sha256
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            MeowPlayer-windows-x64.zip
-            MeowPlayer-windows-x64.zip.sha256
+            livewall.exe
+            livewall.exe.sha256
